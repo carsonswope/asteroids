@@ -49,21 +49,27 @@
 	var Asteroid = __webpack_require__(3);
 	// var Ship = require('./ship.js');
 	var Game = __webpack_require__(4);
-	var GameView = __webpack_require__(6);
+	var GameView = __webpack_require__(7);
 
+	var canvasEl = document.getElementsByTagName("canvas")[0];
 
 	var g = new Game();
-	g.addAsteroids();
-	var canvasEl = document.getElementsByTagName("canvas")[0];
+
+	g.DIM_Y = window.innerHeight-25;
+	g.DIM_X = window.innerWidth-15;
+
 	canvasEl.height = g.DIM_Y;
 	canvasEl.width = g.DIM_X;
+
 	var ctx = canvasEl.getContext("2d");
+
+	g.addAsteroids();
+	g.addShip();
 
 	var gv = new GameView(g, ctx);
 	// m.draw(ctx);
 	// console.log(a);
 	// a.draw(ctx);
-	console.log(g);
 	gv.start();
 
 
@@ -97,9 +103,11 @@
 	  ctx.fill();
 	};
 
-	MovingObject.prototype.move = function() {
-	  this.pos[0] += this.vel[0];
-	  this.pos[1] += this.vel[1];
+	MovingObject.prototype.move = function(dT) {
+	  // debugger
+	  // if (!dT) { dT = 20; }
+	  this.pos[0] += this.vel[0] * dT / 20;
+	  this.pos[1] += this.vel[1] * dT / 20;
 
 	  this.pos = this.game.wrap([this.pos[0], this.pos[1]], this);
 	};
@@ -111,13 +119,7 @@
 
 
 	MovingObject.prototype.collideWith = function (otherObject) {
-	  // console.log("movingobject collideWith");
-	  // console.log("asteroid collideWith");
-	  // if (otherObject.constructor.name === "Ship") {
-	  //   otherObject.relocate();
-	  // }
-	  // this.game.remove(this);
-	  // this.game.remove(otherObject);
+
 	};
 
 	MovingObject.prototype.distance = function (pos1, pos2) {
@@ -147,6 +149,30 @@
 	  childClass.prototype.constructor = childClass;
 	};
 
+	Util.prototype.multiplyVector = function(vector, magnitude) {
+
+	};
+
+	Util.prototype.angleMagnitudeToCartesian = function (angle, magnitude) {
+	  return [magnitude * Math.cos(angle), magnitude * Math.sin(angle)];
+	};
+
+	Util.prototype.extractAngle = function(vector) {
+
+	  var xVel = vector[0];
+	  var yVel = vector[1];
+	  var angle = Math.atan2(yVel, xVel);
+	  if (xVel === 0) {
+	    if (yVel > 0) {
+	      angle = 1.5 * Math.PI;
+	    } else {
+	      angle = 0.5 * Math.PI;
+	    }
+	  }
+	  return angle;
+
+	}
+
 	module.exports = Util;
 
 
@@ -175,12 +201,18 @@
 	Util.prototype.inherits(Asteroid, MovingObject);
 
 	Asteroid.prototype.collideWith = function(otherObject) {
-	  if (otherObject.constructor.name === "Ship") {
-	    otherObject.relocate();
+	  if (otherObject.constructor.name === "Ship" && this.constructor.name === "Asteroid") {
+	    this.game.lives -= 1;
+	    if (this.game.lives == 0) {
+	      this.game.over = true;
+	    } else {
+	      otherObject.relocate();
+	    }
 	  }
 	};
 
-	Asteroid.prototype.COLOR = "#000000";
+	// Asteroid.prototype.COLOR = "#000000";
+	Asteroid.prototype.COLOR = "rgba(0,0,0,1)";
 	Asteroid.prototype.RADIUS = 10;
 	Asteroid.prototype.VELOCITY = 5;
 
@@ -197,11 +229,13 @@
 	function Game(){
 	  this.asteroids = [];
 	  this.bullets = [];
-	  this.addShip();
+	  this.score = 0;
+	  this.lives = 3;
+	  this.over = false;
 	}
 
-	Game.prototype.DIM_X = 640;
-	Game.prototype.DIM_Y = 480;
+	// Game.prototype.DIM_X = 640;
+	// Game.prototype.DIM_Y = 480;
 	Game.prototype.NUM_ASTEROIDS = 15;
 
 	Game.prototype.addShip = function () {
@@ -245,7 +279,7 @@
 	};
 
 	Game.prototype.remove = function (obj) {
-	  if (obj.constructor.name === "Asteroid") {
+	  if (obj.constructor.name === "Asteroid" || obj.constructor.name === "FadingAsteroid") {
 	    this.asteroids.splice(this.asteroids.indexOf(obj), 1);
 	  } else if (obj.constructor.name === "Bullet") {
 	    this.bullets.splice(this.bullets.indexOf(obj), 1);
@@ -284,11 +318,17 @@
 	  for (var i = 0; i < this.allObjects().length; i++) {
 	    this.allObjects()[i].draw(ctx);
 	  }
+
+	  ctx.fill
+	  ctx.font="30px Courier";
+	  ctx.fillText("Lives: " + this.lives, 10,30);
+	  ctx.fillText("Score: " + this.score, 10,60);
+
 	};
 
-	Game.prototype.moveObjects = function () {
+	Game.prototype.moveObjects = function (dT) {
 	  for (var i = 0; i < this.allObjects().length; i++) {
-	    this.allObjects()[i].move();
+	    this.allObjects()[i].move(dT);
 	  }
 	};
 
@@ -326,7 +366,8 @@
 	var Util = __webpack_require__(2);
 	var MovingObject = __webpack_require__(1);
 	var Game = __webpack_require__(4);
-	var Bullet = __webpack_require__(8);
+	var Bullet = __webpack_require__(6);
+
 	function Ship (options) {
 	  if (!options['radius']) {
 	    options['radius'] = 10;
@@ -370,8 +411,8 @@
 
 	Ship.prototype.MAX_VELOCITY = 10;
 	Ship.prototype.relocate = function () {
-	  // this.pos = this.game.randomPosition();
-	  // this.vel = [0,0];
+	  this.pos = this.game.randomPosition();
+	  this.vel = [0,0];
 	};
 
 	Ship.prototype.power = function (impulse) {
@@ -389,25 +430,24 @@
 	  this.angle += angle;
 	};
 
-	Ship.prototype.move = function () {
-	  var magnitude = this.extractMagnitude(this.vel) * 0.98;
+	Ship.prototype.move = function (dT) {
+	  var magnitude = this.extractMagnitude(this.vel) * 0.99;
 
-	  var angle = this.extractAngle(this.vel);
+	  var angle = Util.prototype.extractAngle(this.vel);
 
-	  this.vel = this.angToCartesian(angle, magnitude);
+	  this.vel = Util.prototype.angleMagnitudeToCartesian(angle, magnitude);
 
-	  MovingObject.prototype.move.call(this);
+	  MovingObject.prototype.move.call(this, dT);
 	};
 
 
 	Ship.prototype.fireBullet = function () {
 	  // debugger;
-	  var bulletMag = this.extractMagnitude(this.vel) + 2;
 	  var bulletAng = this.angle;
-	  var offset = this.angToCartesian(this.angle,this.radius);
+	  var offset = Util.prototype.angleMagnitudeToCartesian(this.angle,this.radius);
 
 	  var bullet = new Bullet({
-	    vel: this.angToCartesian(bulletAng, bulletMag),
+	    vel: Util.prototype.angleMagnitudeToCartesian(bulletAng, Bullet.prototype.BULLET_VELOCITY),
 	    pos: [this.pos[0] + offset[0], this.pos[1] + offset[1]],
 	    game: this.game
 	  });
@@ -416,24 +456,10 @@
 	  this.game.bullets.push(bullet);
 	};
 
-	Ship.prototype.angToCartesian = function (angle, magnitude) {
-	  return [magnitude * Math.cos(angle), magnitude * Math.sin(angle)];
-	};
-	//
-	Ship.prototype.extractAngle = function (vector) {
-	  var xVel = vector[0];
-	  var yVel = vector[1];
-	  var angle = Math.atan2(yVel, xVel);
-	  if (xVel === 0) {
-	    if (yVel > 0) {
-	      angle = 1.5 * Math.PI;
-	    } else {
-	      angle = 0.5 * Math.PI;
-	    }
-	  }
-	  return angle;
-	};
-	//
+	// Ship.prototype.angToCartesian = function (angle, magnitude) {
+	//   return [magnitude * Math.cos(angle), magnitude * Math.sin(angle)];
+	// };
+
 	Ship.prototype.extractMagnitude = function (vector) {
 	    var xVel = vector[0];
 	    var yVel = vector[1];
@@ -449,8 +475,95 @@
 /* 6 */
 /***/ function(module, exports, __webpack_require__) {
 
+	var MovingObject = __webpack_require__(1);
+	var Util = __webpack_require__(2);
+	var Asteroid = __webpack_require__(3);
+	var FadingAsteroid = __webpack_require__(9);
+
+	function Bullet (options) {
+
+	    if (!options['radius']) {
+	      options['radius'] = 3;
+	    }
+	    if (!options['color']) {
+	      options['color'] = "#FF0000";
+	    }
+
+	    MovingObject.call(this, options);
+	}
+
+	Util.prototype.inherits(Bullet, MovingObject);
+
+	Bullet.prototype.BULLET_VELOCITY = 10;
+
+	Bullet.prototype.move = function () {
+	  this.pos[0] += this.vel[0];
+	  this.pos[1] += this.vel[1];
+
+	  if (this.game.isOutOfBounds(this.pos, this.radius)) {
+
+	    this.game.remove(this);
+	  }
+	};
+
+	Bullet.prototype.collideWith = function (otherObject) {
+	  if (otherObject.constructor.name === "Asteroid") {
+
+	    this.game.score += 1;
+
+	    var asteroidSize = otherObject.radius / 2;
+
+	    for (var i = 0; i < asteroidSize; i++) {
+	      var smoke = new FadingAsteroid({
+	          pos: otherObject.pos,
+	          game: this.game,
+	          radius: otherObject.radius / 1.5,
+	          vel: Util.prototype.angleMagnitudeToCartesian(
+	            Math.random() * 2 * Math.PI,
+	            Math.random()
+	          ),
+	          color: "rgba(0,0,0," + 0.3 + ")"
+	        }
+	      )
+
+	      this.game.asteroids.push(smoke);
+	    }
+
+
+
+	    this.game.remove(otherObject);
+	    // if (otherObject.radius > 15) {
+	    //   var radius = otherObject.radius - 5;
+	    //   this.game.asteroids.push(new Asteroid( {
+	    //     pos: otherObject.pos,
+	    //     game: this.game,
+	    //     radius: radius,
+	    //     vel: this.game.randomVelocity(radius * 2.5),
+	    //   } ));
+	    //   var radius2 = otherObject.radius - radius;
+	    //   this.game.asteroids.push(new Asteroid( {
+	    //     pos: otherObject.pos,
+	    //     game: this.game,
+	    //     radius: radius,
+	    //     vel: this.game.randomVelocity(radius * 1.5),
+	    //   } ));
+	    //
+	    // }
+	    this.game.remove(this);
+	  }
+	};
+
+	module.exports = Bullet;
+
+
+/***/ },
+/* 7 */
+/***/ function(module, exports, __webpack_require__) {
+
 	var Game = __webpack_require__(4);
-	var key = __webpack_require__(7);
+	var key = __webpack_require__(8);
+	var Asteroid = __webpack_require__(3);
+
 	function GameView(game, ctx) {
 	    this.game = game;
 	    this.ctx = ctx;
@@ -459,30 +572,67 @@
 	GameView.prototype.start = function () {
 	  this.setupKeys();
 	  var view = this;
+	  var time = 0;
+	  var dT = 0;
 
-	  var step = function () {
-	    view.checkKeys();
-	    view.game.moveObjects();
+	  var step = function (newTime) {
+	    dT = newTime - time;
+	    time = newTime;
+	    // debugger
+	//
+	    view.checkKeys(dT);
+
+	    if (Math.random() > 0.95 && view.game.asteroids.length < 24) {
+	      var rad = view.game.randomSize();
+	      var pos = view.game.randomPosition();
+
+	      var i = Math.random();
+	      if (i < 0.25) {
+	        pos[0] = -rad;
+	      } else if (i < 0.50) {
+	        pos[1] = -rad;
+	      } else if (i < 0.75) {
+	        pos[0] = view.game.DIM_X+rad;
+	      } else {
+	        pos[1] = view.game.DIM_Y+rad;
+	      }
+	      // debugger;
+	      view.game.asteroids.push( new Asteroid({
+
+	        pos: pos,
+	        game: view.game,
+	        radius: rad,
+	        vel: view.game.randomVelocity(rad)
+
+	      }));
+	    }
+
+	    view.game.moveObjects(dT);
 	    view.game.checkCollisions();
+	    debugger;
 	    view.game.draw(view.ctx);
 
-	    requestAnimationFrame(step);
+	    if (view.game.lives > 0) {
+	      requestAnimationFrame(step);
+	    } else {
+	      view.ctx.fillText("game over", 100,100);
+	    }
 
 	  };
 
 	  requestAnimationFrame(step);
 	};
 
-	GameView.prototype.checkKeys = function () {
+	GameView.prototype.checkKeys = function (dT) {
 	  if (key.isPressed('left')) {
-	    this.game.ship.turn(-Math.PI/32);
+	    this.game.ship.turn(dT * -Math.PI/360);
 	  }
 	  if (key.isPressed('right')) {
-	    this.game.ship.turn(Math.PI/32);
+	    this.game.ship.turn(dT * Math.PI/360);
 	  }
 
 	  if (key.isPressed('up')) {
-	    this.game.ship.power(0.3);
+	    this.game.ship.power(dT / 150);
 	  }
 	};
 
@@ -506,7 +656,7 @@
 
 
 /***/ },
-/* 7 */
+/* 8 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//     keymaster.js
@@ -808,62 +958,39 @@
 
 
 /***/ },
-/* 8 */
+/* 9 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var MovingObject = __webpack_require__(1);
 	var Util = __webpack_require__(2);
 	var Asteroid = __webpack_require__(3);
-	function Bullet (options) {
 
-	    if (!options['radius']) {
-	      options['radius'] = 1;
-	    }
-	    if (!options['color']) {
-	      options['color'] = "#FF0000";
-	    }
+	function FadingAsteroid(options) {
+	  this.step_num = 0;
 
-	    MovingObject.call(this, options);
+	  if (!options['color']) {
+	    options['color'] = "rgba(0,0,0," + this.step_num / this.UNTIL_GONE + ")";
+	  }
+
+	  Asteroid.call(this, options);
 	}
 
-	Util.prototype.inherits(Bullet, MovingObject);
+	Util.prototype.inherits(FadingAsteroid, Asteroid);
 
+	FadingAsteroid.prototype.UNTIL_GONE = 100;
 
-	Bullet.prototype.move = function () {
-	  this.pos[0] += this.vel[0];
-	  this.pos[1] += this.vel[1];
-
-	  if (this.game.isOutOfBounds(this.pos, this.radius)) {
-	    console.log("remove bullet");
-	    console.log(this.game.bullets);
+	FadingAsteroid.prototype.move = function (dT) {
+	  this.step_num += 1;
+	  this.color = "rgba(0,0,0," +
+	    0.3 * (this.UNTIL_GONE - this.step_num)/this.UNTIL_GONE +
+	    ")";
+	  if (this.step_num >= this.UNTIL_GONE) {
 	    this.game.remove(this);
+	  } else {
+	    Asteroid.prototype.move.call(this, dT);
 	  }
 	};
 
-	Bullet.prototype.collideWith = function (otherObject) {
-	  if (otherObject.constructor.name === "Asteroid") {
-	    this.game.remove(otherObject);
-	    if (otherObject.radius > 15) {
-	      var radius = otherObject.radius - 5;
-	      this.game.asteroids.push(new Asteroid( {
-	        pos: otherObject.pos,
-	        game: this.game,
-	        radius: radius,
-	        vel: this.game.randomVelocity(radius * 1.5),
-	      } ));
-	      var radius2 = otherObject.radius - radius;
-	      this.game.asteroids.push(new Asteroid( {
-	        pos: otherObject.pos,
-	        game: this.game,
-	        radius: radius,
-	        vel: this.game.randomVelocity(radius * 1.5),
-	      } ));
-	    }
-	    this.game.remove(this);
-	  }
-	};
-
-	module.exports = Bullet;
+	module.exports = FadingAsteroid;
 
 
 /***/ }
